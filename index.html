@@ -27,7 +27,7 @@ form, .actions {
   gap: 10px;
   margin-bottom: 20px;
 }
-input, button {
+input, select, button {
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -53,9 +53,12 @@ th, td {
   text-align: left;
   font-size: 13px;
 }
-.thermo.green { background: #d4edda; }
-.thermo.yellow { background: #fff3cd; }
-.thermo.red { background: #f8d7da; }
+.sem-verde { color: green; }
+.sem-verde-escuro { color: darkgreen; }
+.sem-amarelo { color: goldenrod; }
+.sem-vermelho { color: red; }
+.concluido { background-color: #eee; color: #999; }
+button.small { font-size: 12px; padding: 4px; }
 </style>
 </head>
 <body>
@@ -66,24 +69,36 @@ th, td {
   <form id="registroForm">
     <input type="text" id="analista" placeholder="Analista" required>
     <input type="text" id="chamado" placeholder="Chamado" required>
-    <input type="text" id="email" placeholder="E-mail enviado" required>
+    <input type="date" id="dataAbertura" required>
+    <input type="date" id="dataEnvioN3">
+    <input type="text" id="fila" placeholder="Fila Encaminhamento">
+    <select id="status">
+      <option>Aguardando Fornecedor</option>
+      <option>Não Enviado ao N3</option>
+      <option>Resolvido</option>
+      <option>Outros</option>
+    </select>
+    <input type="text" id="atualizacao" placeholder="Atualização">
     <button type="submit">Registrar</button>
   </form>
 
   <div class="actions">
-    <button id="exportar">Exportar para Excel</button>
+    <button id="organizar">Organizar por Analista</button>
   </div>
 
   <table id="tabela">
     <thead>
       <tr>
-        <th>Termômetro</th>
+        <th>🚦</th>
         <th>Analista</th>
         <th>Chamado</th>
-        <th>E-mail enviado</th>
+        <th>Data Abertura</th>
+        <th>Data Envio N3</th>
+        <th>Fila</th>
+        <th>Status</th>
         <th>Atualização</th>
         <th>Data Atualização</th>
-        <th>Ação</th>
+        <th>Ações</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -92,15 +107,8 @@ th, td {
 
 <script>
 const firebaseConfig = {
-  apiKey: "AIzaSyBCAnTFGReRhjXKeSeGrcH3enK6lL_Uf_Y",
-  authDomain: "planh-55e03.firebaseapp.com",
-  databaseURL: "https://planh-55e03-default-rtdb.firebaseio.com",
-  projectId: "planh-55e03",
-  storageBucket: "planh-55e03.appspot.com",
-  messagingSenderId: "288085753915",
-  appId: "1:288085753915:web:f413cff93946f357f71c1e"
+  // 🔷 Coloque aqui seu config do Firebase 🔷
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const tbody = document.querySelector("#tabela tbody");
@@ -108,53 +116,99 @@ const tbody = document.querySelector("#tabela tbody");
 document.getElementById('registroForm').addEventListener('submit', e => {
   e.preventDefault();
   const dados = {
-    analista: document.getElementById('analista').value,
-    chamado: document.getElementById('chamado').value,
-    email: document.getElementById('email').value,
-    atualizacao: '',
-    dataAtualizacao: ''
+    analista: analista.value,
+    chamado: chamado.value,
+    dataAbertura: dataAbertura.value,
+    dataEnvioN3: dataEnvioN3.value,
+    fila: fila.value,
+    status: status.value,
+    atualizacao: atualizacao.value,
+    dataAtualizacao: '',
+    concluido: false,
+    criadoEm: Date.now()
   };
   db.ref('planemailh/').push(dados);
-  document.getElementById('registroForm').reset();
+  registroForm.reset();
 });
+
+let organizarPorAnalista = false;
+
+document.getElementById('organizar').onclick = () => {
+  organizarPorAnalista = !organizarPorAnalista;
+  carregar();
+};
 
 function carregar() {
   db.ref('planemailh/').on('value', snap => {
-    tbody.innerHTML = "";
+    let ativos = [], concluidos = [];
     snap.forEach(child => {
       const d = child.val();
-      const key = child.key;
-      const tr = document.createElement("tr");
+      d.key = child.key;
+      if (d.concluido) concluidos.push(d);
+      else ativos.push(d);
+    });
 
-      const diffDays = calcDiffDays(d.dataAtualizacao);
-      let cor = "green";
-      if (diffDays >= 2) cor = "red";
-      else if (diffDays == 1) cor = "yellow";
+    if (organizarPorAnalista) {
+      const analistaAtual = prompt("Qual analista para priorizar?") || '';
+      ativos.sort((a, b) => {
+        if (a.analista === analistaAtual && b.analista !== analistaAtual) return -1;
+        if (a.analista !== analistaAtual && b.analista === analistaAtual) return 1;
+        return ordemTermometro(a, b) || a.criadoEm - b.criadoEm;
+      });
+    } else {
+      ativos.sort((a, b) => ordemTermometro(a, b) || a.criadoEm - b.criadoEm);
+    }
+
+    tbody.innerHTML = "";
+    [...ativos, ...concluidos].forEach(d => {
+      const tr = document.createElement("tr");
+      if (d.concluido) tr.classList.add("concluido");
+
+      const diff = calcDiffDays(d.dataAtualizacao);
+      let semaforo = '';
+      if (!d.concluido) {
+        if (diff === 0) semaforo = `<span class="sem-verde">🟢</span>`;
+        else if (diff === 1) semaforo = `<span class="sem-verde-escuro">🟢</span>`;
+        else if (diff === 2) semaforo = `<span class="sem-amarelo">🟡</span>`;
+        else semaforo = `<span class="sem-vermelho">🔴</span>`;
+      }
 
       tr.innerHTML = `
-        <td class="thermo ${cor}"></td>
+        <td>${semaforo}</td>
         <td>${d.analista}</td>
         <td>${d.chamado}</td>
-        <td>${d.email}</td>
+        <td>${d.dataAbertura}</td>
+        <td>${d.dataEnvioN3}</td>
+        <td>${d.fila}</td>
+        <td>${d.status}</td>
         <td>${d.atualizacao || '-'}</td>
         <td>${d.dataAtualizacao || '-'}</td>
-        <td><button onclick="atualizar('${key}')">Atualizar</button></td>
+        <td>
+          ${!d.concluido ? `
+          <button class="small" onclick="atualizar('${d.key}')">🔄</button>
+          <button class="small" onclick="concluir('${d.key}')">✅</button>` : ''}
+        </td>
       `;
       tbody.appendChild(tr);
     });
   });
 }
 
+function ordemTermometro(a, b) {
+  const tA = calcDiffDays(a.dataAtualizacao);
+  const tB = calcDiffDays(b.dataAtualizacao);
+  return tB - tA;
+}
+
 function calcDiffDays(data) {
   if (!data) return 999;
   const dt = new Date(data);
   const hoje = new Date();
-  const diff = (hoje - dt) / (1000 * 60 * 60 * 24);
-  return Math.floor(diff);
+  return Math.floor((hoje - dt) / (1000 * 60 * 60 * 24));
 }
 
 function atualizar(key) {
-  const texto = prompt("Digite a atualização:");
+  const texto = prompt("Digite a nova atualização:");
   if (!texto) return;
   const agora = new Date().toLocaleString();
   db.ref('planemailh/' + key).update({
@@ -163,19 +217,8 @@ function atualizar(key) {
   });
 }
 
-document.getElementById('exportar').onclick = () => {
-  let csv = "Analista,Chamado,E-mail,Atualização,Data Atualização\n";
-  document.querySelectorAll("#tabela tbody tr").forEach(tr => {
-    const cols = tr.querySelectorAll("td");
-    csv += `${cols[1].textContent},${cols[2].textContent},${cols[3].textContent},${cols[4].textContent},${cols[5].textContent}\n`;
-  });
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "PlanEmailH.csv";
-  a.click();
-  URL.revokeObjectURL(url);
+function concluir(key) {
+  db.ref('planemailh/' + key).update({ concluido: true });
 }
 
 carregar();
