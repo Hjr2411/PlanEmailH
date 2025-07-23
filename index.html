@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Painel de Chamados</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+<style>
+body {
+  font-family: "Segoe UI", sans-serif;
+  background: #f4f4f4;
+  color: #333;
+  margin: 0; padding: 0;
+}
+#login, #painel {
+  max-width: 1000px;
+  margin: 20px auto;
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px #ccc;
+}
+#painel { display: none; }
+form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  padding: 5px;
+  border: 1px solid #ccc;
+  text-align: left;
+}
+.thermo.green { background: #d4edda; }
+.thermo.yellow { background: #fff3cd; }
+.thermo.red { background: #f8d7da; }
+button { margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h2>Login</h2>
+  <input type="text" id="nome" placeholder="Nome"><br>
+  <input type="password" id="senha" placeholder="Senha"><br>
+  <button id="entrar">Entrar</button>
+  <p id="msg" style="color:red;"></p>
+</div>
+
+<div id="painel">
+  <h2>Bem-vindo, <span id="userNome"></span></h2>
+  <button id="sair">Sair</button>
+  <div id="adminArea"></div>
+
+  <h3>Registrar Chamado</h3>
+  <form id="registroForm">
+    <input type="text" id="chamado" placeholder="Chamado" required>
+    <input type="text" id="sistema" placeholder="Sistema" required>
+    <input type="text" id="cenario" placeholder="Cenário">
+    <input type="text" id="assunto" placeholder="Assunto">
+    <input type="date" id="dataAbertura">
+    <input type="date" id="dataEnvioN3">
+    <input type="text" id="fila" placeholder="Fila">
+    <input type="text" id="status" placeholder="Status">
+    <input type="text" id="atualizacao" placeholder="Atualização">
+    <input type="date" id="dataAtualizacao">
+    <button type="submit">Gravar</button>
+  </form>
+
+  <h3>Chamados</h3>
+  <table id="tabela">
+    <thead>
+      <tr>
+        <th>Termômetro</th>
+        <th>Analista</th>
+        <th>Chamado</th>
+        <th>Sistema</th>
+        <th>Cenário</th>
+        <th>Assunto</th>
+        <th>Data Abertura</th>
+        <th>Data Envio N3</th>
+        <th>Fila</th>
+        <th>Status</th>
+        <th>Atualização</th>
+        <th>Data Atualização</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+//const firebaseConfig = {
+//firebase.initializeApp(firebaseConfig);
+//const db = firebase.database();
+  
+  
+  // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBCAnTFGReRhjXKeSeGrcH3enK6lL_Uf_Y",
+  authDomain: "planh-55e03.firebaseapp.com",
+  databaseURL: "https://planh-55e03-default-rtdb.firebaseio.com",
+  projectId: "planh-55e03",
+  storageBucket: "planh-55e03.firebasestorage.app",
+  messagingSenderId: "288085753915",
+  appId: "1:288085753915:web:f413cff93946f357f71c1e",
+  measurementId: "G-6N2W83NT2N"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+  
+  
+  
+  
+  
+  
+  
+
+const loginDiv = document.getElementById('login');
+const painelDiv = document.getElementById('painel');
+const adminArea = document.getElementById('adminArea');
+const tbody = document.querySelector("#tabela tbody");
+
+document.getElementById('entrar').onclick = () => {
+  const nome = document.getElementById('nome').value.trim();
+  const senha = document.getElementById('senha').value.trim();
+  const msg = document.getElementById('msg');
+
+  if (!nome || !senha) {
+    msg.textContent = "Preencha os campos.";
+    return;
+  }
+
+  db.ref('usuarios/' + nome).once('value').then(snap => {
+    const user = snap.val();
+    if (!user) {
+      msg.textContent = "Usuário não encontrado.";
+      return;
+    }
+    if (user.senha !== senha) {
+      msg.textContent = "Senha incorreta.";
+      return;
+    }
+    sessionStorage.setItem('nome', nome);
+    sessionStorage.setItem('admin', user.admin);
+    iniciarPainel(nome, user.admin);
+  });
+};
+
+function iniciarPainel(nome, isAdmin) {
+  loginDiv.style.display = 'none';
+  painelDiv.style.display = 'block';
+  document.getElementById('userNome').textContent = nome;
+
+  if (isAdmin == true || isAdmin == "true") {
+    adminArea.innerHTML = `
+      <h3>Área do Admin</h3>
+      <button id="criarUser">Criar Usuário</button>
+    `;
+    document.getElementById('criarUser').onclick = () => {
+      const novoNome = prompt("Nome do novo usuário:");
+      const novaSenha = prompt("Senha do novo usuário:");
+      const adminFlag = confirm("Este usuário é admin?");
+      if (!novoNome || !novaSenha) return alert("Dados inválidos.");
+      db.ref('usuarios/' + novoNome).set({
+        senha: novaSenha,
+        admin: adminFlag
+      }).then(() => alert("Usuário criado com sucesso!"));
+    };
+  }
+
+  carregarChamados();
+}
+
+document.getElementById('sair').onclick = () => {
+  sessionStorage.clear();
+  location.reload();
+};
+
+document.getElementById('registroForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const nome = sessionStorage.getItem('nome');
+  const dados = {
+    analista: nome,
+    chamado: document.getElementById('chamado').value,
+    sistema: document.getElementById('sistema').value,
+    cenario: document.getElementById('cenario').value,
+    assunto: document.getElementById('assunto').value,
+    dataAbertura: document.getElementById('dataAbertura').value,
+    dataEnvioN3: document.getElementById('dataEnvioN3').value,
+    fila: document.getElementById('fila').value,
+    status: document.getElementById('status').value,
+    atualizacao: document.getElementById('atualizacao').value,
+    dataAtualizacao: document.getElementById('dataAtualizacao').value
+  };
+  db.ref('registros/').push(dados);
+  document.getElementById('registroForm').reset();
+});
+
+function carregarChamados() {
+  db.ref('registros/').on('value', snap => {
+    tbody.innerHTML = "";
+    snap.forEach(child => {
+      const d = child.val();
+      const tr = document.createElement("tr");
+
+      const diffDays = calcDiffDays(d.dataAtualizacao);
+      let cor = "green";
+      if (diffDays >= 2) cor = "red";
+      else if (diffDays == 1) cor = "yellow";
+
+      tr.innerHTML = `
+        <td class="thermo ${cor}"></td>
+        <td>${d.analista}</td>
+        <td>${d.chamado}</td>
+        <td>${d.sistema}</td>
+        <td>${d.cenario}</td>
+        <td>${d.assunto}</td>
+        <td>${d.dataAbertura}</td>
+        <td>${d.dataEnvioN3}</td>
+        <td>${d.fila}</td>
+        <td>${d.status}</td>
+        <td>${d.atualizacao}</td>
+        <td>${d.dataAtualizacao}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+function calcDiffDays(data) {
+  if (!data) return 999;
+  const dt = new Date(data);
+  const hoje = new Date();
+  const diff = (hoje - dt) / (1000 * 60 * 60 * 24);
+  return Math.floor(diff);
+}
+
+window.onload = () => {
+  const nome = sessionStorage.getItem('nome');
+  const admin = sessionStorage.getItem('admin');
+  if (nome) iniciarPainel(nome, admin);
+};
+</script>
+
+</body>
+</html>
