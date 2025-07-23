@@ -2,92 +2,88 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Painel de Chamados</title>
+<title>PlanEmailH</title>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
 <style>
 body {
   font-family: "Segoe UI", sans-serif;
-  background: #f4f4f4;
+  background: #f9f9f9;
   color: #333;
   margin: 0; padding: 0;
 }
-#login, #painel {
-  max-width: 1000px;
+.container {
+  max-width: 1200px;
   margin: 20px auto;
   background: white;
   padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 0 10px #ccc;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
-#painel { display: none; }
-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+h2 { margin-top: 0; }
+form, .actions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 20px;
+}
+input, button {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+button {
+  cursor: pointer;
+  background: #0078d7;
+  color: white;
+  border: none;
+}
+button:hover {
+  background: #005a9e;
 }
 table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 20px;
 }
 th, td {
   padding: 5px;
   border: 1px solid #ccc;
   text-align: left;
+  font-size: 13px;
 }
 .thermo.green { background: #d4edda; }
 .thermo.yellow { background: #fff3cd; }
 .thermo.red { background: #f8d7da; }
-button { margin-top: 10px; }
 </style>
 </head>
 <body>
 
-<div id="login">
-  <h2>Login</h2>
-  <input type="text" id="nome" placeholder="Nome"><br>
-  <input type="password" id="senha" placeholder="Senha"><br>
-  <button id="entrar">Entrar</button>
-  <p id="msg" style="color:red;"></p>
-</div>
+<div class="container">
+  <h2>PlanEmailH</h2>
 
-<div id="painel">
-  <h2>Bem-vindo, <span id="userNome"></span></h2>
-  <button id="sair">Sair</button>
-  <div id="adminArea"></div>
-
-  <h3>Registrar Chamado</h3>
   <form id="registroForm">
+    <input type="text" id="analista" placeholder="Analista" required>
     <input type="text" id="chamado" placeholder="Chamado" required>
-    <input type="text" id="sistema" placeholder="Sistema" required>
-    <input type="text" id="cenario" placeholder="Cenário">
-    <input type="text" id="assunto" placeholder="Assunto">
-    <input type="date" id="dataAbertura">
-    <input type="date" id="dataEnvioN3">
-    <input type="text" id="fila" placeholder="Fila">
-    <input type="text" id="status" placeholder="Status">
-    <input type="text" id="atualizacao" placeholder="Atualização">
-    <input type="date" id="dataAtualizacao">
-    <button type="submit">Gravar</button>
+    <input type="text" id="email" placeholder="E-mail enviado" required>
+    <button type="submit">Registrar</button>
   </form>
 
-  <h3>Chamados</h3>
+  <div class="actions">
+    <button id="exportar">Exportar para Excel</button>
+  </div>
+
   <table id="tabela">
     <thead>
       <tr>
         <th>Termômetro</th>
         <th>Analista</th>
         <th>Chamado</th>
-        <th>Sistema</th>
-        <th>Cenário</th>
-        <th>Assunto</th>
-        <th>Data Abertura</th>
-        <th>Data Envio N3</th>
-        <th>Fila</th>
-        <th>Status</th>
+        <th>E-mail enviado</th>
         <th>Atualização</th>
         <th>Data Atualização</th>
+        <th>Ação</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -107,93 +103,27 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
-const loginDiv = document.getElementById('login');
-const painelDiv = document.getElementById('painel');
-const adminArea = document.getElementById('adminArea');
 const tbody = document.querySelector("#tabela tbody");
-
-document.getElementById('entrar').onclick = () => {
-  const nome = document.getElementById('nome').value.trim();
-  const senha = document.getElementById('senha').value.trim();
-  const msg = document.getElementById('msg');
-
-  if (!nome || !senha) {
-    msg.textContent = "Preencha os campos.";
-    return;
-  }
-
-  db.ref('usuarios/' + nome).once('value').then(snap => {
-    const user = snap.val();
-    if (!user) {
-      msg.textContent = "Usuário não encontrado.";
-      return;
-    }
-    if (user.senha !== senha) {
-      msg.textContent = "Senha incorreta.";
-      return;
-    }
-    sessionStorage.setItem('nome', nome);
-    sessionStorage.setItem('admin', user.admin);
-    iniciarPainel(nome, user.admin);
-  });
-};
-
-function iniciarPainel(nome, isAdmin) {
-  loginDiv.style.display = 'none';
-  painelDiv.style.display = 'block';
-  document.getElementById('userNome').textContent = nome;
-
-  if (isAdmin == true || isAdmin == "true") {
-    adminArea.innerHTML = `
-      <h3>Área do Admin</h3>
-      <button id="criarUser">Criar Usuário</button>
-    `;
-    document.getElementById('criarUser').onclick = () => {
-      const novoNome = prompt("Nome do novo usuário:");
-      const novaSenha = prompt("Senha do novo usuário:");
-      const adminFlag = confirm("Este usuário é admin?");
-      if (!novoNome || !novaSenha) return alert("Dados inválidos.");
-      db.ref('usuarios/' + novoNome).set({
-        senha: novaSenha,
-        admin: adminFlag
-      }).then(() => alert("Usuário criado com sucesso!"));
-    };
-  }
-
-  carregarChamados();
-}
-
-document.getElementById('sair').onclick = () => {
-  sessionStorage.clear();
-  location.reload();
-};
 
 document.getElementById('registroForm').addEventListener('submit', e => {
   e.preventDefault();
-  const nome = sessionStorage.getItem('nome');
   const dados = {
-    analista: nome,
+    analista: document.getElementById('analista').value,
     chamado: document.getElementById('chamado').value,
-    sistema: document.getElementById('sistema').value,
-    cenario: document.getElementById('cenario').value,
-    assunto: document.getElementById('assunto').value,
-    dataAbertura: document.getElementById('dataAbertura').value,
-    dataEnvioN3: document.getElementById('dataEnvioN3').value,
-    fila: document.getElementById('fila').value,
-    status: document.getElementById('status').value,
-    atualizacao: document.getElementById('atualizacao').value,
-    dataAtualizacao: document.getElementById('dataAtualizacao').value
+    email: document.getElementById('email').value,
+    atualizacao: '',
+    dataAtualizacao: ''
   };
-  db.ref('registros/').push(dados);
+  db.ref('planemailh/').push(dados);
   document.getElementById('registroForm').reset();
 });
 
-function carregarChamados() {
-  db.ref('registros/').on('value', snap => {
+function carregar() {
+  db.ref('planemailh/').on('value', snap => {
     tbody.innerHTML = "";
     snap.forEach(child => {
       const d = child.val();
+      const key = child.key;
       const tr = document.createElement("tr");
 
       const diffDays = calcDiffDays(d.dataAtualizacao);
@@ -205,15 +135,10 @@ function carregarChamados() {
         <td class="thermo ${cor}"></td>
         <td>${d.analista}</td>
         <td>${d.chamado}</td>
-        <td>${d.sistema}</td>
-        <td>${d.cenario}</td>
-        <td>${d.assunto}</td>
-        <td>${d.dataAbertura}</td>
-        <td>${d.dataEnvioN3}</td>
-        <td>${d.fila}</td>
-        <td>${d.status}</td>
-        <td>${d.atualizacao}</td>
-        <td>${d.dataAtualizacao}</td>
+        <td>${d.email}</td>
+        <td>${d.atualizacao || '-'}</td>
+        <td>${d.dataAtualizacao || '-'}</td>
+        <td><button onclick="atualizar('${key}')">Atualizar</button></td>
       `;
       tbody.appendChild(tr);
     });
@@ -228,11 +153,32 @@ function calcDiffDays(data) {
   return Math.floor(diff);
 }
 
-window.onload = () => {
-  const nome = sessionStorage.getItem('nome');
-  const admin = sessionStorage.getItem('admin');
-  if (nome) iniciarPainel(nome, admin);
-};
+function atualizar(key) {
+  const texto = prompt("Digite a atualização:");
+  if (!texto) return;
+  const agora = new Date().toLocaleString();
+  db.ref('planemailh/' + key).update({
+    atualizacao: texto,
+    dataAtualizacao: agora
+  });
+}
+
+document.getElementById('exportar').onclick = () => {
+  let csv = "Analista,Chamado,E-mail,Atualização,Data Atualização\n";
+  document.querySelectorAll("#tabela tbody tr").forEach(tr => {
+    const cols = tr.querySelectorAll("td");
+    csv += `${cols[1].textContent},${cols[2].textContent},${cols[3].textContent},${cols[4].textContent},${cols[5].textContent}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "PlanEmailH.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+carregar();
 </script>
 
 </body>
