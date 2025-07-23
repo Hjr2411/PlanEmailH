@@ -8,39 +8,23 @@
 <style>
 body {
   font-family: "Segoe UI", sans-serif;
-  background: #f9f9f9;
+  background: #f0f2f5;
   color: #333;
-  margin: 0; padding: 0;
+  margin: 0; padding: 20px;
 }
 .container {
   max-width: 1200px;
-  margin: 20px auto;
+  margin: auto;
   background: white;
   padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
-h2 { margin-top: 0; }
-form, .actions {
-  display: flex;
-  flex-wrap: wrap;
+form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 10px;
   margin-bottom: 20px;
-}
-input, select, button {
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 14px;
-}
-button {
-  cursor: pointer;
-  background: #0078d7;
-  color: white;
-  border: none;
-}
-button:hover {
-  background: #005a9e;
 }
 table {
   width: 100%;
@@ -48,48 +32,48 @@ table {
   margin-top: 20px;
 }
 th, td {
-  padding: 5px;
   border: 1px solid #ccc;
+  padding: 6px;
   text-align: left;
-  font-size: 13px;
 }
-.sem-verde { color: green; }
-.sem-verde-escuro { color: darkgreen; }
-.sem-amarelo { color: goldenrod; }
-.sem-vermelho { color: red; }
-.concluido { background-color: #eee; color: #999; }
-button.small { font-size: 12px; padding: 4px; }
+tr.concluido {
+  background: #eee;
+  color: #888;
+}
+button.small {
+  font-size: 12px;
+  padding: 2px 4px;
+  margin: 0 1px;
+}
 </style>
 </head>
 <body>
-
 <div class="container">
   <h2>PlanEmailH</h2>
 
-  <form id="registroForm">
+  <form id="form">
     <input type="text" id="analista" placeholder="Analista" required>
     <input type="text" id="chamado" placeholder="Chamado" required>
     <input type="date" id="dataAbertura" required>
-    <input type="date" id="dataEnvioN3">
-    <input type="text" id="fila" placeholder="Fila Encaminhamento">
+    <input type="date" id="dataEnvioN3" required>
+    <input type="text" id="fila" placeholder="Fila" required>
     <select id="status">
-      <option>Aguardando Fornecedor</option>
-      <option>Não Enviado ao N3</option>
-      <option>Resolvido</option>
-      <option>Outros</option>
+      <option value="Aguardando Fornecedor">Aguardando Fornecedor</option>
+      <option value="Não enviado ao N3">Não enviado ao N3</option>
+      <option value="Resolvido">Resolvido</option>
+      <option value="Outros">Outros</option>
     </select>
     <input type="text" id="atualizacao" placeholder="Atualização">
-    <button type="submit">Registrar</button>
+    <button type="submit">Inserir</button>
   </form>
 
-  <div class="actions">
-    <button id="organizar">Organizar por Analista</button>
-  </div>
+  <button onclick="carregar()">🔄 Atualizar Tabela</button>
+  <button onclick="organizarPorAnalista = true; carregar();">👤 Organizar por Analista</button>
 
-  <table id="tabela">
+  <table>
     <thead>
       <tr>
-        <th>🚦</th>
+        <th>Semáforo</th>
         <th>Analista</th>
         <th>Chamado</th>
         <th>Data Abertura</th>
@@ -101,45 +85,63 @@ button.small { font-size: 12px; padding: 4px; }
         <th>Ações</th>
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="tbody"></tbody>
   </table>
 </div>
 
 <script>
 const firebaseConfig = {
-  // 🔷 Coloque aqui seu config do Firebase 🔷
+  // 🔷 coloque aqui a sua configuração do Firebase
 };
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const tbody = document.querySelector("#tabela tbody");
 
-document.getElementById('registroForm').addEventListener('submit', e => {
+const tbody = document.getElementById('tbody');
+let organizarPorAnalista = false;
+
+document.getElementById('form').addEventListener('submit', e => {
   e.preventDefault();
   const dados = {
-    analista: analista.value,
-    chamado: chamado.value,
-    dataAbertura: dataAbertura.value,
-    dataEnvioN3: dataEnvioN3.value,
-    fila: fila.value,
-    status: status.value,
-    atualizacao: atualizacao.value,
-    dataAtualizacao: '',
+    analista: form.analista.value,
+    chamado: form.chamado.value,
+    dataAbertura: form.dataAbertura.value,
+    dataEnvioN3: form.dataEnvioN3.value,
+    fila: form.fila.value,
+    status: form.status.value,
+    atualizacao: form.atualizacao.value,
+    dataAtualizacao: "",
     concluido: false,
     criadoEm: Date.now()
   };
-  db.ref('planemailh/').push(dados);
-  registroForm.reset();
+  db.ref('planemailh/').push(dados).then(() => {
+    form.reset();
+    carregar();
+  });
 });
 
-let organizarPorAnalista = false;
+function atualizar(key) {
+  const novaAtualizacao = prompt("Nova atualização:");
+  if (!novaAtualizacao) return;
+  const dataAtual = new Date().toISOString();
+  db.ref(`planemailh/${key}`).update({
+    atualizacao: novaAtualizacao,
+    dataAtualizacao: dataAtual
+  }).then(carregar);
+}
 
-document.getElementById('organizar').onclick = () => {
-  organizarPorAnalista = !organizarPorAnalista;
-  carregar();
-};
+function concluir(key) {
+  db.ref(`planemailh/${key}`).update({ concluido: true }).then(carregar);
+}
+
+function ordemTermometro(a, b) {
+  const diffA = calcDiffDays(a.dataAtualizacao);
+  const diffB = calcDiffDays(b.dataAtualizacao);
+  return diffB - diffA; // vermelho primeiro
+}
 
 function carregar() {
-  db.ref('planemailh/').on('value', snap => {
+  db.ref('planemailh/').once('value').then(snap => {
     let ativos = [], concluidos = [];
     snap.forEach(child => {
       const d = child.val();
@@ -167,10 +169,10 @@ function carregar() {
       const diff = calcDiffDays(d.dataAtualizacao);
       let semaforo = '';
       if (!d.concluido) {
-        if (diff === 0) semaforo = `<span class="sem-verde">🟢</span>`;
-        else if (diff === 1) semaforo = `<span class="sem-verde-escuro">🟢</span>`;
-        else if (diff === 2) semaforo = `<span class="sem-amarelo">🟡</span>`;
-        else semaforo = `<span class="sem-vermelho">🔴</span>`;
+        if (diff === 0) semaforo = `🟢`;
+        else if (diff === 1) semaforo = `🟢`;
+        else if (diff === 2) semaforo = `🟡`;
+        else semaforo = `🔴`;
       }
 
       tr.innerHTML = `
@@ -182,7 +184,7 @@ function carregar() {
         <td>${d.fila}</td>
         <td>${d.status}</td>
         <td>${d.atualizacao || '-'}</td>
-        <td>${d.dataAtualizacao || '-'}</td>
+        <td>${formatarData(d.dataAtualizacao) || '-'}</td>
         <td>
           ${!d.concluido ? `
           <button class="small" onclick="atualizar('${d.key}')">🔄</button>
@@ -191,38 +193,25 @@ function carregar() {
       `;
       tbody.appendChild(tr);
     });
+    organizarPorAnalista = false;
   });
-}
-
-function ordemTermometro(a, b) {
-  const tA = calcDiffDays(a.dataAtualizacao);
-  const tB = calcDiffDays(b.dataAtualizacao);
-  return tB - tA;
 }
 
 function calcDiffDays(data) {
   if (!data) return 999;
   const dt = new Date(data);
   const hoje = new Date();
-  return Math.floor((hoje - dt) / (1000 * 60 * 60 * 24));
+  const diff = (hoje - dt) / (1000 * 60 * 60 * 24);
+  return Math.floor(diff);
 }
 
-function atualizar(key) {
-  const texto = prompt("Digite a nova atualização:");
-  if (!texto) return;
-  const agora = new Date().toLocaleString();
-  db.ref('planemailh/' + key).update({
-    atualizacao: texto,
-    dataAtualizacao: agora
-  });
+function formatarData(data) {
+  if (!data) return "";
+  const d = new Date(data);
+  return `${d.getDate().toString().padStart(2,0)}/${(d.getMonth()+1).toString().padStart(2,0)}/${d.getFullYear()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
 }
 
-function concluir(key) {
-  db.ref('planemailh/' + key).update({ concluido: true });
-}
-
-carregar();
+window.onload = carregar;
 </script>
-
 </body>
 </html>
