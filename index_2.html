@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlanEmailH - Sistema de Gestão de E-mails N3</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="glass-card rounded-lg p-6 mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                        <i class="fas fa-envelope-open-text text-blue-600 mr-3"></i>
+                        PlanEmailH
+                    </h1>
+                    <p class="text-gray-600">Sistema de Gestão de E-mails para Suporte N3</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="openModal()" class="btn-windows">
+                        <i class="fas fa-plus mr-2"></i>Novo Chamado
+                    </button>
+                    <button onclick="exportToExcel()" class="btn-windows">
+                        <i class="fas fa-file-excel mr-2"></i>Exportar Excel
+                    </button>
+                    <button id="adminButton" class="btn-windows hidden" onclick="openAdminModal()">
+                        <i class="fas fa-user-shield mr-2"></i>Admin
+                    </button>
+                    <button id="logoutButton" class="btn-windows hidden" onclick="logout()">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Sair
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="header-stats">
+                <div class="stat-card">
+                    <div class="stat-number text-green-600" id="totalAtivos">0</div>
+                    <div class="stat-label">Chamados Ativos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-red-600" id="totalVermelho">0</div>
+                    <div class="stat-label">Críticos (Vermelho)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-yellow-600" id="totalAmarelo">0</div>
+                    <div class="stat-label">Atenção (Amarelo)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-gray-600" id="totalConcluido">0</div>
+                    <div class="stat-label">Concluídos</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kanban Board -->
+        <div class="kanban-board">
+            <div class="kanban-column">
+                <h2 class="column-title">Ativos</h2>
+                <div id="ativosColumn" class="column-content"></div>
+            </div>
+            <div class="kanban-column">
+                <h2 class="column-title">Críticos</h2>
+                <div id="criticosColumn" class="column-content"></div>
+            </div>
+            <div class="kanban-column">
+                <h2 class="column-title">Atenção</h2>
+                <div id="atencaoColumn" class="column-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Login</h2>
+            <form id="loginForm">
+                <div class="form-group mb-4">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" class="input-field" required>
+                </div>
+                <div class="form-group mb-6">
+                    <label for="loginPassword">Senha</label>
+                    <input type="password" id="loginPassword" class="input-field" required>
+                </div>
+                <button type="submit" class="btn-windows w-full">Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for New Call -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Novo Chamado</h2>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <form id="chamadoForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="analista">Analista *</label>
+                        <input type="text" id="analista" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="chamado">Chamado *</label>
+                        <input type="text" id="chamado" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sistema">Sistema *</label>
+                        <input type="text" id="sistema" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="cenario">Cenário *</label>
+                        <input type="text" id="cenario" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="assunto">Assunto do E-mail *</label>
+                        <input type="text" id="assunto" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dataAbertura">Data de Abertura *</label>
+                        <input type="date" id="dataAbertura" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dataEnvioN3">Data de Envio para o N3 *</label>
+                        <input type="datetime-local" id="dataEnvioN3" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="fila">Fila *</label>
+                        <input type="text" id="fila" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status *</label>
+                        <select id="status" class="select-field" required>
+                            <option value="">Selecione...</option>
+                            <option value="aguardando fornecedor">Aguardando Fornecedor</option>
+                            <option value="nao enviado ao N3">Não Enviado ao N3</option>
+                            <option value="resolvido">Resolvido</option>
+                            <option value="outros">Outros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="atualizacao">Atualização Inicial</label>
+                        <textarea id="atualizacao" class="input-field" rows="3" placeholder="Descrição inicial do chamado..."></textarea>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeModal()" class="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn-windows">
+                        <i class="fas fa-save mr-2"></i>Salvar Chamado
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Modal -->
+    <div id="adminModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Gerenciar Usuários</h2>
+                <button onclick="closeAdminModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="userForm" class="mb-6">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="userEmail">Email</label>
+                        <input type="email" id="userEmail" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userPassword">Senha</label>
+                        <input type="password" id="userPassword" class="input-field" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="isAdmin">Administrador</label>
+                        <input type="checkbox" id="isAdmin" class="ml-2">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="submit" class="btn-windows"><i class="fas fa-user-plus mr-2"></i>Adicionar Usuário</button>
+                </div>
+            </form>
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Usuários Existentes</h3>
+            <div class="table-container">
+                <table class="w-full">
+                    <thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Admin</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody">
+                        <!-- Usuários serão inseridos aqui -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
+
+
