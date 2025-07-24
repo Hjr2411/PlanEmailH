@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getDatabase, ref, set, get, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
@@ -13,6 +13,7 @@ const firebaseConfig = {
     measurementId: "G-6N2W83NT2N"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const database = getDatabase(app);
@@ -42,6 +43,9 @@ async function login(email, password) {
             localStorage.setItem('isAdmin', isAdmin.toString());
             showAlert('Login realizado com sucesso!');
             loadChamados();
+            document.getElementById('logoutButton').classList.remove('hidden');
+            document.getElementById('adminButton').classList.toggle('hidden', !isAdmin);
+            document.getElementById('exportButton').classList.toggle('hidden', !isAdmin);
         } else {
             throw new Error('Usuário não encontrado');
         }
@@ -59,6 +63,9 @@ async function logout() {
     localStorage.removeItem('isAdmin');
     showAlert('Logout realizado com sucesso!');
     document.getElementById('cardContainer').innerHTML = '';
+    document.getElementById('logoutButton').classList.add('hidden');
+    document.getElementById('adminButton').classList.add('hidden');
+    document.getElementById('exportButton').classList.add('hidden');
 }
 
 // Função para carregar chamados
@@ -140,12 +147,102 @@ function openAdminModal() {
         showAlert('Apenas administradores podem acessar esta área', 'error');
         return;
     }
-    // Load users and show the admin modal 
+    loadUsers();
+    document.getElementById('adminModal').style.display = 'block';
 }
 
 // Função para fechar modal admin
 function closeAdminModal() {
     document.getElementById('adminModal').style.display = 'none';
+}
+
+// Função para carregar usuários
+async function loadUsers() {
+    const usersRef = ref(database, 'usuarios');
+    const snapshot = await get(usersRef);
+    const tbody = document.getElementById('userTableBody');
+    tbody.innerHTML = '';
+
+    if (snapshot.exists()) {
+        const users = snapshot.val();
+        Object.entries(users).forEach(([uid, userData]) => {
+            const row = `
+                <tr>
+                    <td class="px-3 py-4 text-sm text-gray-900">${userData.email}</td>
+                    <td class="px-3 py-4 text-sm text-gray-900">${userData.admin ? 'Sim' : 'Não'}</td>
+                    <td class="px-3 py-4">
+                        <button class="btn-danger" onclick="deleteUser('${uid}')">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+}
+
+// Função para excluir usuário
+async function deleteUser(uid) {
+    if (confirm('Você tem certeza que deseja excluir este usuário?')) {
+        await remove(ref(database, `usuarios/${uid}`));
+        loadUsers();
+    }
+}
+
+// Função para criar novo usuário
+document.getElementById('userForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const email = document.getElementById('userEmail').value;
+    const password = document.getElementById('userPassword').value;
+
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        await set(ref(database, `usuarios/${user.uid}`), {
+            email: email,
+            admin: false
+        });
+
+        showAlert('Usuário criado com sucesso!');
+        loadUsers();
+        document.getElementById('userForm').reset();
+    } catch (error) {
+        showAlert('Erro ao criar usuário: ' + error.message, 'error');
+    }
+});
+
+// Função para exportar para Excel
+function exportToExcel() {
+    if (!currentUser) {
+        showAlert('Faça login para exportar dados', 'error');
+        return;
+    }
+
+    const data = []; // Prepare data for export
+    const chamadosRef = ref(database, `usuarios/${currentUser.uid}/chamados`);
+    get(chamadosRef).then(snapshot => {
+        if (snapshot.exists()) {
+            const chamados = snapshot.val();
+            Object.entries(chamados).forEach(([id, chamado]) => {
+                data.push({
+                    'Título': chamado.titulo,
+                    'Descrição': chamado.descricao,
+                });
+            });
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Chamados');
+            XLSX.writeFile(wb, `Chamados_${new Date().toISOString().split('T')[0]}.xlsx`);
+            showAlert('Arquivo Excel exportado com sucesso!');
+        } else {
+            showAlert('Nenhum chamado encontrado para exportar.', 'info');
+        }
+    }).catch(error => {
+        showAlert('Erro ao exportar: ' + error.message, 'error');
+    });
 }
 
 // Event listeners
@@ -163,6 +260,9 @@ document.addEventListener('DOMContentLoaded', function() {
         currentUser = JSON.parse(savedUser);
         isAdmin = localStorage.getItem('isAdmin') === 'true';
         loadChamados();
+        document.getElementById('logoutButton').classList.remove('hidden');
+        document.getElementById('adminButton').classList.toggle('hidden', !isAdmin);
+        document.getElementById('exportButton').classList.toggle('hidden', !isAdmin);
     }
 });
 
@@ -170,12 +270,16 @@ document.addEventListener('DOMContentLoaded', function() {
 window.onclick = function(event) {
     const modal = document.getElementById('modal');
     const loginModal = document.getElementById('loginModal');
+    const adminModal = document.getElementById('adminModal');
     
     if (event.target === modal) {
         closeModal();
     }
     if (event.target === loginModal) {
         closeModal();
+    }
+    if (event.target === adminModal) {
+        closeAdminModal();
     }
 };
 
@@ -187,3 +291,5 @@ window.closeAdminModal = closeAdminModal;
 window.logout = logout;
 window.updateChamado = updateChamado;
 window.deleteChamado = deleteChamado;
+window.deleteUser = deleteUser;
+window.exportToExcel = exportToExcel;
