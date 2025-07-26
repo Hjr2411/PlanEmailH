@@ -1,28 +1,12 @@
-{
-  "users": {
-    "Marco": {
-      "password": "999999",
-      "admin": false,
-      "name": "Marco",
-      "email": "marco@example.com",
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "lastLogin": "2024-01-01T00:00:00.000Z"
-    }
-  },
-  "chamados": {
-    "exemplo_id": {
-      "analista": "Marco",
-      "chamado": "CH001",
-      "sistema": "Sistema Exemplo",
-      "cenario": "Cenário de Teste",
-      "assunto": "Exemplo de chamado",
-      "dataAbertura": "2024-01-01",
-      "dataEnvioN3": "2024-01-01",
-      "fila": "N3",
-      "status": "Pendente",
-      "atualizacaoInicial": "Chamado de exemplo para teste",
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "createdBy": "Marco"
-    }
-  }
+"Admin": {
+  "password": "admin123",
+  "admin": true,
+  "name": "Administrador",
+  "createdAt": "2024-01-01T00:00:00.000Z"
+}
+"user": {
+  "password": "123456",
+  "admin": false,
+  "name": "user1",
+  "createdAt": "2024-02-01T00:00:00.100Z"
 }
